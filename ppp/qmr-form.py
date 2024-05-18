@@ -5,8 +5,8 @@ from sklearn.metrics import roc_auc_score
 from sklearn.preprocessing import StandardScaler
 
 # 读取数据
-train_df = pd.read_csv('train.csv')
-test_df = pd.read_csv('test.csv')
+train_df = pd.read_csv('ppp/train.csv')
+test_df = pd.read_csv('ppp/test.csv')
 
 # 数据预处理
 # 将分类变量转换为数值型

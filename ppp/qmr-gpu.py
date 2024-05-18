@@ -5,7 +5,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import roc_auc_score
 
 # 从train.csv读取数据
-train_data = pd.read_csv("train.csv")
+train_data = pd.read_csv("ppp/train.csv")
 
 # 数据预处理
 train_data['Gender'] = train_data['Gender'].map({'Male': 0, 'Female': 1})
@@ -17,7 +17,7 @@ y = train_data['Exited']
 X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
 
 # 从test.csv读取数据
-test_data = pd.read_csv("test.csv")
+test_data = pd.read_csv("ppp/test.csv")
 test_data['Gender'] = test_data['Gender'].map({'Male': 0, 'Female': 1})
 test_data['Geography'] = test_data['Geography'].map({'France': 0, 'Spain': 1, 'Germany': 2})
 test_data = test_data.drop(columns=['id', 'CustomerId', 'Surname'])
