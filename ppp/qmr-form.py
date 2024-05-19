@@ -20,6 +20,8 @@ train_df['Geography'] = train_df['Geography'].map(geo_dict)
 test_df['Geography'] = test_df['Geography'].map(geo_dict)
 
 # 移除无关的特征
+# train_df = train_df.drop(['id', 'CustomerId', 'Surname','EstimatedSalary'], axis=1)
+# test_df = test_df.drop(['id', 'CustomerId', 'Surname','EstimatedSalary'], axis=1)
 train_df = train_df.drop(['id', 'CustomerId', 'Surname'], axis=1)
 test_df = test_df.drop(['id', 'CustomerId', 'Surname'], axis=1)
 
@@ -76,7 +78,7 @@ class LogisticRegressionWithSGD:
         return 1 / (1 + np.exp(-z))
 
 # 实例化模型
-model = LogisticRegressionWithSGD(learning_rate=0.3, n_iterations=1000, regularization_strength=5, momentum_factor=3)
+model = LogisticRegressionWithSGD(learning_rate=0.1, n_iterations=1000, regularization_strength=0.5, momentum_factor=0.3)
 
 # 训练模型
 model.fit(X_train_scaled, y_train)
