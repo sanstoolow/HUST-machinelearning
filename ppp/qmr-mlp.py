@@ -3,7 +3,9 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score
-
+from sklearn.model_selection import cross_val_score
+from sklearn.metrics import make_scorer, roc_auc_score
+from joblib import dump
 # 读取数据
 train_df = pd.read_csv('ppp/train.csv')
 test_df = pd.read_csv('ppp/test.csv')
@@ -58,43 +60,87 @@ class MLP:
             self.weights.append(np.random.randn(layer_sizes[i], layer_sizes[i + 1]) * 0.01)
             self.biases.append(np.zeros((1, layer_sizes[i + 1])))
         
+    def relu(self, x):
+        return np.maximum(0, x)
+
+    def relu_derivative(self, x):
+        return (x > 0).astype(int)
+    
     def sigmoid(self, x):
         return 1 / (1 + np.exp(-x))
     
     def sigmoid_derivative(self, x):
         return x * (1 - x)
     
+    def score(self, X, y):
+        y_pred = self.predict_proba(X)
+        return roc_auc_score(y, y_pred)
+
+    # def forward(self, X):
+    #     activations = [X]
+    #     inputs = []
+        
+    #     for W, b in zip(self.weights, self.biases):
+    #         z = np.dot(activations[-1], W) + b
+    #         inputs.append(z)
+    #         a = self.sigmoid(z)
+    #         activations.append(a)
+        
+    #     return activations, inputs
     def forward(self, X):
         activations = [X]
         inputs = []
-        
-        for W, b in zip(self.weights, self.biases):
+    
+        for i, (W, b) in enumerate(zip(self.weights, self.biases)):
             z = np.dot(activations[-1], W) + b
             inputs.append(z)
-            a = self.sigmoid(z)
+            if i == len(self.weights) - 1:  # 如果是最后一层，使用sigmoid函数
+                a = self.sigmoid(z)
+            else:  # 否则，使用relu函数
+                a = self.relu(z)
             activations.append(a)
         
         return activations, inputs
-    
+        
+    # def backward(self, activations, inputs, y):
+    #     m = y.shape[0]
+    #     deltas = [activations[-1] - y]
+        
+    #     # Calculate deltas for all layers
+    #     for i in range(len(self.weights) - 1, 0, -1):
+    #         delta = np.dot(deltas[0], self.weights[i].T) * self.sigmoid_derivative(activations[i])
+    #         deltas.insert(0, delta)
+        
+    #     dW = []
+    #     db = []
+        
+    #     # Calculate gradients for weights and biases
+    #     for i in range(len(self.weights)):
+    #         dW.append(np.dot(activations[i].T, deltas[i]) / m)
+    #         db.append(np.sum(deltas[i], axis=0, keepdims=True) / m)
+        
+    #     return dW, db
     def backward(self, activations, inputs, y):
         m = y.shape[0]
         deltas = [activations[-1] - y]
         
-        # Calculate deltas for all layers
+    # Calculate deltas for all layers
         for i in range(len(self.weights) - 1, 0, -1):
-            delta = np.dot(deltas[0], self.weights[i].T) * self.sigmoid_derivative(activations[i])
+            if i == len(self.weights) - 1:  # 如果是最后一层，使用sigmoid函数的导数
+                delta = np.dot(deltas[0], self.weights[i].T) * self.sigmoid_derivative(activations[i])
+            else:  # 否则，使用relu函数的导数
+                delta = np.dot(deltas[0], self.weights[i].T) * self.relu_derivative(activations[i])
             deltas.insert(0, delta)
         
         dW = []
         db = []
-        
-        # Calculate gradients for weights and biases
+    
+    # Calculate gradients for weights and biases
         for i in range(len(self.weights)):
             dW.append(np.dot(activations[i].T, deltas[i]) / m)
             db.append(np.sum(deltas[i], axis=0, keepdims=True) / m)
         
         return dW, db
-    
     def update_params(self, dW, db, learning_rate):
         for i in range(len(self.weights)):
             self.weights[i] -= learning_rate * dW[i]
@@ -126,17 +172,19 @@ y_val = y_val.values.reshape(-1, 1)
 input_size = X_train.shape[1]
 hidden_layers = [100, 50]
 output_size = 1
-
 mlp = MLP(input_size, hidden_layers, output_size)
+# mlp = MLP(input_size, hidden_layers, output_size)
 
 # 训练模型
-mlp.fit(X_train, y_train, epochs=1000, learning_rate=0.01)
+mlp.fit(X_train, y_train, epochs=2000, learning_rate=0.001)
 
 # 在验证集上进行预测
 y_val_pred = mlp.predict_proba(X_val)
 val_auc = roc_auc_score(y_val, y_val_pred)
 print("Validation AUC:", val_auc)
-
+# 使用交叉验证评估模型
+scores = cross_val_score(mlp, X_scaled, y.values.reshape(-1, 1), cv=5, scoring=make_scorer(roc_auc_score))
+print("Cross-validated AUC:", np.mean(scores))
 # 在测试集上进行预测
 test_predictions = mlp.predict_proba(X_test_scaled)
 

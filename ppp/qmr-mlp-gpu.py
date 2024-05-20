@@ -86,22 +86,22 @@ criterion = nn.BCELoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 # 训练模型
-# epochs = 100000
-# for epoch in range(epochs):
-#     model.train()
-#     optimizer.zero_grad()
-#     outputs = model(X_train)
-#     loss = criterion(outputs, y_train)
-#     loss.backward()
-#     optimizer.step()
+epochs = 100000
+for epoch in range(epochs):
+    model.train()
+    optimizer.zero_grad()
+    outputs = model(X_train)
+    loss = criterion(outputs, y_train)
+    loss.backward()
+    optimizer.step()
 
-#     if epoch % 100 == 0:
-#         model.eval()
-#         with torch.no_grad():
-#             val_outputs = model(X_val)
-#             val_loss = criterion(val_outputs, y_val).item()
-#             val_auc = roc_auc_score(y_val.cpu().numpy(), val_outputs.cpu().numpy())
-#             print(f'Epoch {epoch}, Loss: {loss.item():.4f}, Val Loss: {val_loss:.4f}, Val AUC: {val_auc:.4f}')
+    if epoch % 100 == 0:
+        model.eval()
+        with torch.no_grad():
+            val_outputs = model(X_val)
+            val_loss = criterion(val_outputs, y_val).item()
+            val_auc = roc_auc_score(y_val.cpu().numpy(), val_outputs.cpu().numpy())
+            print(f'Epoch {epoch}, Loss: {loss.item():.4f}, Val Loss: {val_loss:.4f}, Val AUC: {val_auc:.4f}')
 # 训练模型
 # epochs = 100000
 # for epoch in range(epochs):
