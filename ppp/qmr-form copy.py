@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score
 from sklearn.preprocessing import StandardScaler
+from skopt import gp_minimize
 
 # 读取数据
 train_df = pd.read_csv('ppp/train.csv')
@@ -71,10 +72,34 @@ class LogisticRegressionWithSGD:
     def _sigmoid(self, z):
         return 1 / (1 + cp.exp(-z))
 
-# 实例化模型
-model = LogisticRegressionWithSGD(learning_rate=0.1, n_iterations=1000, regularization_strength=0.5, momentum_factor=0.3)
+# 定义一个函数，该函数接受超参数作为输入，并返回模型的负AUC分数
+def objective(params):
+    learning_rate, n_iterations, regularization_strength, momentum_factor = params
 
-# 训练模型
+    model = LogisticRegressionWithSGD(learning_rate=learning_rate, n_iterations=n_iterations, regularization_strength=regularization_strength, momentum_factor=momentum_factor)
+
+    model.fit(cp.asarray(X_train_scaled), cp.asarray(y_train))
+
+    y_val_pred = model.predict(cp.asarray(X_val_scaled))
+    val_auc = roc_auc_score(y_val, y_val_pred)
+
+    # 我们返回负AUC分数，因为我们希望最小化这个函数
+    return -val_auc
+
+# 定义超参数的范围
+space = [(0.0001, 0.5, 'log-uniform'),  # learning_rate
+         (100, 3000),  # n_iterations
+         (1e-6, 5e-1, 'log-uniform'),  # regularization_strength
+         (0.1, 0.9)]  # momentum_factor
+
+# 使用贝叶斯优化来找到最佳的超参数
+res = gp_minimize(objective, space, n_calls=50, random_state=0)
+
+# 输出最佳的超参数
+print("Best parameters: {}".format(res.x))
+
+# 使用最佳的超参数来训练模型
+model = LogisticRegressionWithSGD(learning_rate=res.x[0], n_iterations=res.x[1], regularization_strength=res.x[2], momentum_factor=res.x[3])
 model.fit(cp.asarray(X_train_scaled), cp.asarray(y_train))
 
 # 在验证集上评估模型

@@ -1,3 +1,4 @@
+import cupy as cp
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
@@ -5,7 +6,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import cross_val_score
 from sklearn.metrics import make_scorer, roc_auc_score
-from joblib import dump
+# from joblib import dump
 # 读取数据
 train_df = pd.read_csv('ppp/train.csv')
 test_df = pd.read_csv('ppp/test.csv')
@@ -47,6 +48,7 @@ X_test_scaled = scaler.transform(X_test)
 X_train, X_val, y_train, y_val = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
 
 class MLP:
+    
     def __init__(self, input_size, hidden_layers, output_size):
         self.input_size = input_size
         self.hidden_layers = hidden_layers
@@ -57,31 +59,31 @@ class MLP:
         # Initialize weights and biases
         layer_sizes = [input_size] + hidden_layers + [output_size]
         for i in range(len(layer_sizes) - 1):
-            self.weights.append(np.random.randn(layer_sizes[i], layer_sizes[i + 1]) * 0.01)
-            self.biases.append(np.zeros((1, layer_sizes[i + 1])))
+            self.weights.append(cp.random.randn(layer_sizes[i], layer_sizes[i + 1]) * 0.01)
+            self.biases.append(cp.zeros((1, layer_sizes[i + 1])))
         
     def relu(self, x):
-        return np.maximum(0, x)
+        return cp.maximum(0, x)
 
     def relu_derivative(self, x):
         return (x > 0).astype(int)
     
     def sigmoid(self, x):
-        return 1 / (1 + np.exp(-x))
+        return 1 / (1 + cp.exp(-x))
     
     def sigmoid_derivative(self, x):
         return x * (1 - x)
     
     def score(self, X, y):
         y_pred = self.predict_proba(X)
-        return roc_auc_score(y, y_pred)
+        return roc_auc_score(y.get(), y_pred.get())
 
     def forward(self, X):
         activations = [X]
         inputs = []
     
         for i, (W, b) in enumerate(zip(self.weights, self.biases)):
-            z = np.dot(activations[-1], W) + b
+            z = cp.dot(activations[-1], W) + b
             inputs.append(z)
             if i == len(self.weights) - 1:  # 如果是最后一层，使用sigmoid函数
                 a = self.sigmoid(z)
@@ -97,9 +99,9 @@ class MLP:
     # Calculate deltas for all layers
         for i in range(len(self.weights) - 1, 0, -1):
             if i == len(self.weights) - 1:  # 如果是最后一层，使用sigmoid函数的导数
-                delta = np.dot(deltas[0], self.weights[i].T) * self.sigmoid_derivative(activations[i])
+                delta = cp.dot(deltas[0], self.weights[i].T) * self.sigmoid_derivative(activations[i])
             else:  # 否则，使用relu函数的导数
-                delta = np.dot(deltas[0], self.weights[i].T) * self.relu_derivative(activations[i])
+                delta = cp.dot(deltas[0], self.weights[i].T) * self.relu_derivative(activations[i])
             deltas.insert(0, delta)
         
         dW = []
@@ -124,7 +126,7 @@ class MLP:
             
             if epoch % 100 == 0:
                 predictions = self.predict_proba(X)
-                loss = -np.mean(y * np.log(predictions) + (1 - y) * np.log(1 - predictions))
+                loss = -cp.mean(y * np.log(predictions) + (1 - y) * cp.log(1 - predictions))
                 print(f'Epoch {epoch}, Loss: {loss:.4f}')
     
     def predict_proba(self, X):
@@ -134,27 +136,34 @@ class MLP:
     def predict(self, X):
         proba = self.predict_proba(X)
         return (proba > 0.5).astype(int)
+    
 # 准备标签
-y_train = y_train.values.reshape(-1, 1)
-y_val = y_val.values.reshape(-1, 1)
+y_train = cp.asarray(y_train.values.reshape(-1, 1))  # 使用cp.asarray将pandas数据转换为cupy数组
+y_val = cp.asarray(y_val.values.reshape(-1, 1))
+
+# 准备特征
+X_train_cp = cp.asarray(X_train)
+X_val_cp = cp.asarray(X_val)
 
 # 定义MLP模型
-input_size = X_train.shape[1]
+input_size = X_train_cp.shape[1]
 hidden_layers = [500, 200]
 output_size = 1
 mlp = MLP(input_size, hidden_layers, output_size)
-# mlp = MLP(input_size, hidden_layers, output_size)
 
 # 训练模型
-mlp.fit(X_train, y_train, epochs=2000, learning_rate=0.01)
+mlp.fit(X_train_cp, y_train, epochs=2000, learning_rate=0.01)
 
 # 在验证集上进行预测
-y_val_pred = mlp.predict_proba(X_val)
-val_auc = roc_auc_score(y_val, y_val_pred)
+y_val_pred = mlp.predict_proba(X_val_cp)
+val_auc = roc_auc_score(y_val.get(), y_val_pred.get())
 print("Validation AUC:", val_auc)
-# 使用交叉验证评估模型
-scores = cross_val_score(mlp, X_scaled, y.values.reshape(-1, 1), cv=5, scoring=make_scorer(roc_auc_score))
-print("Cross-validated AUC:", np.mean(scores))
+
+# # 使用交叉验证评估模型
+# X_scaled_cp = cp.asarray(X_scaled)
+# y_cp = cp.asarray(y.values.reshape(-1, 1))
+# scores = cross_val_score(mlp, X_scaled_cp, y_cp, cv=5, scoring=make_scorer(roc_auc_score))
+# print("Cross-validated AUC:", np.mean(scores))
 # 在测试集上进行预测
 test_predictions = mlp.predict_proba(X_test_scaled)
 
