@@ -4,31 +4,22 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score
 from sklearn.preprocessing import StandardScaler
 
-# 读取数据
 train_df = pd.read_csv('ppp/train.csv')
 test_df = pd.read_csv('ppp/test.csv')
 
-# 数据预处理
-# 将分类变量转换为独热编码
+# 数据处理
 train_df = pd.get_dummies(train_df, columns=['Gender', 'Geography'])
 test_df = pd.get_dummies(test_df, columns=['Gender', 'Geography'])
-
 test_customer_ids = test_df['id']
-
-# 移除无关的特征
 train_df = train_df.drop(['id', 'CustomerId', 'Surname'], axis=1)
 test_df = test_df.drop(['id', 'CustomerId', 'Surname'], axis=1)
-
-# 将特征和标签分离
 X = train_df.drop('Exited', axis=1)
 y = train_df['Exited']
 
-# 特征缩放
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 X_train_scaled, X_val_scaled, y_train, y_val = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
 
-# 逻辑回归模型实现，包括L2正则化和Nesterov Momentum
 class LogisticRegressionWithSGD:
     def __init__(self, learning_rate=0.01, n_iterations=1000, regularization_strength=0.1, momentum_factor=0.9):
         self.learning_rate = learning_rate
@@ -48,7 +39,6 @@ class LogisticRegressionWithSGD:
         self.bias_momentum = 0
 
         for _ in range(self.n_iterations):
-            # Nesterov Momentum
             weights_next = self.weights - self.learning_rate * (self.weight_momentums * self.momentum_factor
                                                                   + self.regularization_strength * self.weights
                                                                   + cp.dot(X.T, (self._sigmoid(cp.dot(X, self.weights + self.weight_momentums * self.momentum_factor) + self.bias) - y)) / n_samples)
@@ -58,7 +48,6 @@ class LogisticRegressionWithSGD:
 
             self.weight_momentums = self.weights - weights_next
             self.bias_momentum = self.bias - bias_next
-
             self.weights = weights_next
             self.bias = bias_next
 
@@ -72,20 +61,16 @@ class LogisticRegressionWithSGD:
         return 1 / (1 + cp.exp(-z))
 
 # 实例化模型
-model = LogisticRegressionWithSGD(learning_rate=0.1, n_iterations=1000, regularization_strength=0.5, momentum_factor=0.3)
+model = LogisticRegressionWithSGD(learning_rate=0.2, n_iterations=1000, regularization_strength=0.5, momentum_factor=0.3)
 
-# 训练模型
 model.fit(cp.asarray(X_train_scaled), cp.asarray(y_train))
-
-# 在验证集上评估模型
 y_val_pred = model.predict(cp.asarray(X_val_scaled))
+
 val_auc = roc_auc_score(y_val, y_val_pred)
 print(f'Validation AUC: {val_auc}')
 
-# 在测试集上进行预测
 test_df_scaled = scaler.transform(test_df)
 test_predictions = model.predict(cp.asarray(test_df_scaled))
 
-# 准备提交
 submission_df = pd.DataFrame({'id': test_customer_ids, 'Exited': test_predictions})
 submission_df.to_csv('submission.csv', index=False)
